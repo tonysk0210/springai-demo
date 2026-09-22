@@ -6,7 +6,7 @@
   <img alt="Java" src="https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-4.1.0-6DB33F?logo=springboot&logoColor=white">
   <img alt="Spring AI" src="https://img.shields.io/badge/Spring%20AI-2.0.0-6DB33F?logo=spring&logoColor=white">
-  <img alt="Maven" src="https://img.shields.io/badge/Maven-Wrapper-C71A36?logo=apachemaven&logoColor=white">
+  <img alt="Maven" src="https://img.shields.io/badge/Maven-3.9.11-C71A36?logo=apachemaven&logoColor=white">
   <img alt="Lombok" src="https://img.shields.io/badge/Lombok-1.18.46-BC4521?logo=lombok&logoColor=white">
 </p>
 <p>
@@ -47,8 +47,6 @@
 |---|---|---|
 | [`mySpringAi`](./mySpringAi) | **8080** | Spring Boot 4.1 後端 — 所有 LLM 整合模式的實作，Docker 服務由 `spring-boot-docker-compose` 自動帶起 |
 | [`mySpringAi-ui`](./mySpringAi-ui) | **5173** | React 19 + Vite 8 前端 — 深色主題 SPA，把每條後端端點包成一個可互動的展示頁 |
-
-> 兩個子專案**沒有父層聚合 POM**，各自獨立開發與建置。前端在開發模式下由 Vite 代理 `/api/*` 到 `:8080` 並**去除 `/api` 前綴**，因此開發環境完全不需要設定 CORS。
 
 > 本專案以學習與實驗為目的。部分設定（開放的 Actuator 端點、空密碼的 H2 Console、100% trace 採樣率、提交進版控的 `api.properties`）僅適用本機，**不可直接用於正式環境** — 完整清單見 [已知的刻意取捨](#已知的刻意取捨)。
 > 遇到問題？ → [疑難排解](#疑難排解)
@@ -126,72 +124,99 @@ flowchart LR
     style E fill:#8b7cff,stroke:#10151f,color:#ffffff
 ```
 
-Redis 後端閾值設為 **0.9**（較嚴格，較少誤命中），Qdrant 後端設為 **0.8**（較寬鬆，命中率高但可能答非所問）—— 兩者並存就是為了讓這個取捨可以直接體感比較。
-
 ### 畫面截圖
 
-> 展開下方分組可看其餘 9 張；所有截圖放在 [`docs/screenshots/`](./docs/screenshots)。
+> 展開下方分組可看其餘 12 張；所有截圖放在 [`docs/screenshots/`](./docs/screenshots)。
 
 #### 首頁
 
-**展示首頁** — `http://localhost:5173`，左側選單由 `src/config/apiRoutes.js` 的 8 個群組動態產生，右側是共用的 `ChatBox`；頂端輸入的使用者名稱會成為需要記憶的端點的 `conversationId`。
+**API Playground** — `http://localhost:5173`。左側選單由 `src/config/apiRoutes.js` 的 8 個群組動態產生，每一項都標註了該端點使用的模型（`gpt-4.1-mini`、`llama3.2:1b`、`whisper-1`…）；右側是共用的 `ChatBox`，標頭顯示對應的 API 端口。尚未送出請求時，中央會顯示 `apiTestGuides.js` 提供的**測試重點**與**建議提問** —— 以無記憶對話為例，它直接給了「我叫做 Tony」與「我叫什麼名字？（預期：LLM 不知道）」這組對照用的提示。頂端輸入的使用者名稱會成為需要記憶的端點的 `conversationId`。
 
-![前端首頁](docs/screenshots/home.png)
+![前端 API Playground 首頁](docs/screenshots/home.png)
 
 <details>
 <summary><b>💬 對話與檢索 — JDBC 記憶、PDF RAG、客服工單 Tool</b></summary>
 
 <br>
 
-**JDBC 對話記憶** — `/openai/chat-jdbc`，連續兩輪對話。第二輪不重述主詞也能接上上下文，因為 `MessageChatMemoryAdvisor` 以 `userName` 為 `conversationId`，把歷史從 H2 的 `SPRING_AI_CHAT_MEMORY` 表撈回來塞進 prompt。重啟後端後歷史仍在。
+**JDBC 對話記憶** — `/openai/chat-jdbc`，使用者 `demo-user` 的連續兩輪對話。第一輪說「記住我最喜歡的顏色是藍色」，第二輪只問「我最喜歡的顏色是什麼」就能正確答出藍色 —— 因為 `MessageChatMemoryAdvisor` 以 `userName` 為 `conversationId`，把歷史從 H2 的 `SPRING_AI_CHAT_MEMORY` 表撈回來塞進 prompt。**重啟後端後歷史仍在**，這正是它與 In-Memory 版本的差別。
 
-![JDBC 對話記憶](docs/screenshots/chat-memory.png)
+![JDBC 對話記憶連續兩輪](docs/screenshots/openai-chat-jdbc.png)
 
-**PDF RAG** — `/rag/ragPdf`，針對 `ApexTech_Solutions_HR_Policy_Manual.pdf` 提問。`pdf-RA-Advisor` 對 Qdrant `pdf-collection` 做 topK=3、threshold=0.5 的檢索，把結果填進 `RagPdfPromptTemplate.st` 的 `{context}`。
+**PDF RAG** — `/rag/ragPdf`，問「遠端工作政策是什麼？」。答案（每週最多 WFH 2 天、須連線公司 VPN、參加每日站會與每週例會）完全來自 `ApexTech_Solutions_HR_Policy_Manual.pdf` —— 這些內容不在模型的訓練資料裡，是 `pdf-RA-Advisor` 對 Qdrant `pdf-collection` 做 topK=3、threshold=0.5 檢索後，填進 `RagPdfPromptTemplate.st` 的 `{context}` 才讓模型答得出來。
 
-![PDF RAG 問答](docs/screenshots/rag-pdf.png)
+![PDF RAG 問答](docs/screenshots/ragpdf.png)
 
-**客服工單 Tool** — `/tool/helpDeskTicket`，先請 LLM 建立工單、再查詢狀態。工單歸屬的 `userName` 由後端經 `toolContext` 注入，**不交給 LLM 自行填寫**，因此模型無法偽造他人身分查詢工單。
+**客服工單 Tool** — `/tool/helpDeskTicket`。使用者說「我的 Nova AI Pro 帳號無法登入，請幫我建立工單」，模型**沒有直接開新單**，而是先呼叫 `getTicketStatus` 查到既有工單，回覆「您已有相似的工單，工單編號為 17，狀態為 OPEN，預計處理時間是 2026-07-24」。查詢用的 `userName` 由後端經 `toolContext` 注入，**不交給 LLM 自行填寫**，因此模型無法偽造他人身分查別人的工單。
 
-![客服工單 Tool Calling](docs/screenshots/tool-ticket.png)
-
-</details>
-
-<details>
-<summary><b>🎨 多模態 — 圖片生成、語音合成與轉錄</b></summary>
-
-<br>
-
-**進階圖片生成** — `/image/image-options`，可指定 model、quality、size。產出的 PNG 落在後端 `image-output/`，再由 `WebMvcConfig` 的資源映射以 `/generated-images/**` 對外提供，前端直接 `<img>` 引用。
-
-![圖片生成](docs/screenshots/image-gen.png)
-
-**音訊處理** — `/audio/text-to-speech-options` 與 `/audio/transcribe-options`。前者可選 voice、speed 與六種輸出格式（mp3／opus／aac／flac／wav／pcm），回應為二進位串流並在瀏覽器直接播放；後者上傳音檔走 `multipart/form-data` 交給 Whisper 轉文字。
-
-![音訊轉錄與語音合成](docs/screenshots/audio.png)
+![客服工單 Tool Calling](docs/screenshots/helpdeskticket.png)
 
 </details>
 
 <details>
-<summary><b>🔭 觀測性與資料層 — Jaeger、Grafana、Qdrant、Redis</b></summary>
+<summary><b>⚡ 語意快取 — 一次命中的前後對照</b></summary>
 
 <br>
 
-**Jaeger — 單筆請求的 span 瀑布** — `http://localhost:16686`。一次 RAG 請求會展開成多層 span：HTTP 進入點 → `db.vector.client.operation`（Qdrant 檢索，來自 `VectorStoreConfig` 手動接上的 `ObservationRegistry`）→ `chat` span（LLM 呼叫）。Tool Calling 場景下會看到同一次 HTTP 請求內出現多個 `chat` span。
+**前端提問** — `/cache/redisCaching-chat`，問「請介紹 Spring Boot」，秒回一段完整的 Spring Boot 介紹。
 
-![Jaeger trace 瀑布圖](docs/screenshots/jaeger-trace.png)
+![Redis 語意快取問答](docs/screenshots/redis-chat.png)
 
-**Grafana — 指標儀表板** — `http://localhost:3000`（admin/admin），資料來自 Prometheus 抓取的 `/actuator/prometheus`。可看 JVM 狀態、HTTP 請求速率，以及 Spring AI 自帶的 chat client 與 vector store 指標。
+**Redis Insight 裡的那筆快取** — `http://localhost:8001`。同一筆資料在 Redis 中是一個 44 KB 的 JSON key `cache:fedfdca3-…`，欄位包含 `context_hash`、`embedding`、`response`、`response_text` 與 `content`。
 
-![Grafana 儀表板](docs/screenshots/grafana.png)
+關鍵在最後一欄：**`content` 的值是「什麼是 Spring Boot？」，而剛才在 UI 輸入的是「請介紹 Spring Boot」** —— 兩句話的字面完全不同，卻命中了同一筆快取。這就是語意快取與一般 key-value 快取的根本差異：比對的是 embedding 向量的相似度（Redis 後端閾值 0.9），不是字串相等。命中時整個 LLM 呼叫被短路，`TokenUsageAuditAdvisor` 不會記錄到任何新的 token 用量。
 
-**Qdrant Dashboard** — `http://localhost:6333/dashboard`。三個 collection 一次看清：`rag-collection`（starter 依 properties 自動建立）、`pdf-collection` 與 `caching-collection`（由 `VectorStoreConfig` 手動建立）。可直接瀏覽每個 point 的 payload 與向量維度。
+![Redis Insight 中的語意快取項目](docs/screenshots/redis-cache.png)
 
-![Qdrant collection 清單](docs/screenshots/qdrant.png)
+</details>
 
-**Redis Insight** — `http://localhost:8001`。Redis Stack 內建的 UI，可看到語意快取寫入的 key 與其向量欄位 —— 這也是驗證「快取到底有沒有命中」最直接的地方。
+<details>
+<summary><b>🎨 多模態 — 圖片生成與語音合成</b></summary>
 
-![Redis Insight 快取項目](docs/screenshots/redis-insight.png)
+<br>
+
+**進階圖片生成** — `/image/image-options`，以「未來城市的空中捷運站，廣角構圖，科幻概念藝術」搭配 model `gpt-image-1`、quality `auto`、size `1024x1024` 產圖。產出的 PNG 落在後端 `image-output/`，再由 `WebMvcConfig` 的資源映射以 `/generated-images/**` 對外提供，前端直接 `<img>` 引用 —— 瀏覽器碰不到後端磁碟，這層映射就是兩者之間的橋。
+
+![進階圖片生成](docs/screenshots/image-option.png)
+
+**進階文字轉語音** — `/audio/text-to-speech-options`，voice `alloy`、speed `1`、format `mp3`，把「各位旅客您好，本班列車即將抵達終點站。」合成為 5 秒語音。回應是二進位串流而非檔案路徑，前端收到後轉成 blob URL 直接播放並提供下載 —— **後端不留檔**，離開頁面即釋放。
+
+![進階文字轉語音](docs/screenshots/text-to-speech-option.png)
+
+</details>
+
+<details>
+<summary><b>🔭 觀測性與資料層 — Jaeger、Grafana、Qdrant</b></summary>
+
+<br>
+
+**Jaeger — trace 清單** — `http://localhost:16686`。不同端點的成本差異一眼可見：`/tool/helpDeskTicket` 花 **2.93s／15 spans**、`/rag/ragPdf` 是 **2.66s／12 spans**，而單純的 `/openai/chat-jdbc` 只有 **1.1–1.3s／9 spans**。多出來的 span 正是工具呼叫的額外 LLM 往返與向量檢索。
+
+![Jaeger trace 清單](docs/screenshots/jaeger.png)
+
+**Jaeger — `/rag/preAndPostRAAdvisor` 的 span 瀑布** — 這張圖把 [§1 開頭的時序圖](#一則問答的完整旅程)變成了實測數據：**總時長 6.47s、depth 9、共 17 個 span**。展開後可以看到三段各自獨立的耗時：
+
+| span | 耗時 | 對應機制 |
+|---|---|---|
+| `retrieval_augmentation` → `spring_ai chat_client` → `chat gpt-4.1-mini` | 1.67s | **前置查詢翻譯** —— 翻譯本身就是一次完整的 LLM 呼叫 |
+| `qdrant query` → `embedding text-embedding-ada-002` | 1.62s（其中 embedding 1.51s） | **向量檢索** —— 這個 span 之所以存在，是因為 `VectorStoreConfig` 手動注入了 `ObservationRegistry` |
+| `token_usage_audit` → `pretty_logger` → `chat gpt-4.1-mini` | 3.06s | **最終生成** —— 帶著增強後 prompt 的那次呼叫 |
+
+換句話說，一條「看起來只是問一句話」的 RAG 端點，實際上打了**兩次 LLM 與一次 embedding**，而且翻譯佔掉了四分之一的總時間。這是只看回應內容永遠不會發現的成本結構。
+
+![Jaeger span 瀑布圖](docs/screenshots/jaeger-span.png)
+
+**Grafana — Gen AI Token 消耗** — `http://localhost:3000`（admin/admin）。`mySpringAi` 儀表板的 `Gen AI Total Token Consumption` 面板把三條序列疊在一起：OpenAI `gpt-4.1-mini` 的 chat（tooltip 顯示累計 6,966 tokens）、Ollama `llama3.2:1b` 的 chat、以及 `text-embedding-ada-002` 的 embedding。**本機模型與雲端模型的用量在同一張圖上直接對照**，指標由 Spring AI 自帶的 `gen_ai_*` 系列提供，經 Actuator 由 Prometheus 抓取。
+
+![Grafana Gen AI Token 消耗面板](docs/screenshots/grafana-openai.png)
+
+**Grafana Explore — 查 Ollama 的 token 明細** — 同一份指標改用 Explore 直接下 PromQL：`gen_ai_client_token_usage_total{gen_ai_system="ollama"}`，以 stacked lines 拆出 `input`／`output`／`total` 三種 `gen_ai_token_type`。排查「到底是輸入還輸出吃掉 token」時，這裡比儀表板直接。
+
+![Grafana Explore 查詢 Ollama token 用量](docs/screenshots/grafana-ollama.png)
+
+**Qdrant Dashboard** — `http://localhost:6333/dashboard`（Qdrant v1.18.2）。三個 collection 狀態全為 GREEN，向量設定一致（**1536 維、Cosine 距離**，對應 OpenAI embedding 模型）：`rag-collection` 57 個 point（starter 依 properties 自動建立）、`pdf-collection` 8 個（HR 手冊切出的 chunk）、`caching-collection` 1 個（目前只快取了一筆問答）。
+
+![Qdrant collection 清單](docs/screenshots/qdrant-dashboard.png)
 
 </details>
 
@@ -354,7 +379,8 @@ springai-demo/
 │   │   ├── promptTemplate/                       # 4 個 StringTemplate（.st）
 │   │   ├── ApexTech_Solutions_HR_Policy_Manual.pdf   # RAG 語料（繁體中文）
 │   │   └── SpringAI.mp3                          # 轉錄測試素材
-│   ├── image-output/ · audio-output/             # 生成檔案落地處
+│   ├── image-output/                             # 生成圖片落地處，對外映射 /generated-images/**
+│   ├── audio-output/                             # 早期版本殘留；TTS 目前直接串流回傳，不寫檔
 │   ├── h2db/                                     # H2 檔案式資料庫
 │   ├── compose.yml                               # ★ 5 個服務，由 Boot 啟動時自動帶起
 │   ├── prometheus-config.yml                     # 掛載進 Prometheus 容器
@@ -510,7 +536,7 @@ API 回傳的是 `ImageGenerationResponseDto{ imageUrl }`，前端拿到相對�
 | `wav` | `audio/wav` |
 | `pcm` | `application/octet-stream` |
 
-轉錄方向則是 `multipart/form-data` 上傳，上限由 `spring.servlet.multipart.max-file-size=25MB` 控制 —— 這個值需要與 Whisper 的檔案大小限制一起考慮。`AudioControllerAdvice` 專門攔截音訊相關例外（例如空檔案）轉成 `AudioErrorResponseDto`，避免前端拿到一坨 stack trace。
+與圖片不同，**TTS 不在後端留檔** —— `AudioController` 直接把位元組回傳，前端轉成 blob URL 播放，離開頁面即釋放。轉錄方向則是 `multipart/form-data` 上傳，上限由 `spring.servlet.multipart.max-file-size=25MB` 控制 —— 這個值需要與 Whisper 的檔案大小限制一起考慮。`AudioControllerAdvice` 專門攔截音訊相關例外（例如空檔案）轉成 `AudioErrorResponseDto`，避免前端拿到一坨 stack trace。
 
 ### 🔭 觀測性三件套
 
@@ -573,7 +599,7 @@ export default function MyFeaturePage() {
 | Java | 25 | `pom.xml` 的 `java.version` |
 | Spring Boot | 4.1.0 | `spring-boot-starter-parent` |
 | Spring AI | 2.0.0 | 由 `spring-ai-bom` 統一管理版本 |
-| Maven Wrapper | 內建 | 使用 `./mvnw`，不需另裝 Maven |
+| Maven | 3.9.11 | 由 Maven Wrapper（`wrapperVersion=3.3.4`）自動下載，使用 `./mvnw`，不需另裝 Maven |
 | Lombok | 1.18.46 | Java 23+ 需顯式宣告 `annotationProcessorPaths` |
 
 ### Spring AI 模組
@@ -812,7 +838,7 @@ management.tracing.export.enabled=true
 | `POST /audio/text-to-speech` | 文字轉語音 | 預設聲音，MP3 輸出 |
 | `POST /audio/text-to-speech-options` | 文字轉語音 | 可設定 voice、speed、format |
 
-產出音訊存於 `audio-output/`。
+TTS 回應為二進位串流，**後端不寫檔**（`audio-output/` 內的檔案是早期版本的殘留）。
 
 ### 請求與回應格式
 

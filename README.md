@@ -500,12 +500,12 @@ Advisor：翻譯問題 → 查 Qdrant → 遮罩文件 PII → 組成增強後 u
 
 ```java
 String response = chatClient.prompt()
-        .system(helpDeskTicketPromptTemplate)         // 載入客服流程規則
-        .tools(helpDeskTicketTool)                    // 本次請求專用工具，保留預設的 TimeTool
-        .toolContext(Map.of("userName", userName))    // ★ 身分由後端注入，不經過 LLM
-        .advisors(a -> a.param(CONVERSATION_ID, "toolHelpDeskTicket-" + userName))
-        .user(payload.message())
-        .call().content();
+        .system(helpDeskTicketPromptTemplate)         // 客服回答規則
+        .tools(helpDeskTicketTool)                    // 本次可用的客服工單工具
+        .toolContext(Map.of("userName", userName))    // 後端提供的可信身分，LLM 無法竄改
+        .advisors(a -> a.param(CONVERSATION_ID, "toolHelpDeskTicket-" + userName)) // 此使用者的客服對話記憶 ID
+        .user(payload.message())                       // 使用者問題
+        .call().content();                             // 必要時執行工具，再回傳最終文字
 ```
 
 `userName` 走 `toolContext` 而非工具參數，代表**模型無法偽造他人身分**去查詢工單 —— 即使使用者在提示詞裡宣稱自己是別人，`getTicketStatus` 拿到的仍是 header 帶進來的真實身分。這是 Tool Calling 最容易被忽略的安全邊界。

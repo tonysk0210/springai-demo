@@ -424,7 +424,6 @@ springai-demo/
 | [📐 結構化輸出四種形態](#-結構化輸出四種形態) | 讓 LLM 回傳的東西可以直接當 Java 物件用 |
 | [🎨 多模態與檔案輸出](#-多模態與檔案輸出) | 生成的圖片怎麼從後端磁碟送到瀏覽器 |
 | [🔭 觀測性三件套](#-觀測性三件套) | 向量檢索要手動接 ObservationRegistry 才有 span |
-| [🖥️ 資料驅動的前端導覽](#️-資料驅動的前端導覽) | 新增一個展示頁只要動三個地方 |
 
 ### 🧱 一個 Bean 一種組合
 
@@ -576,35 +575,6 @@ QdrantVectorStore.builder(qdrantClient, embeddingModel)
 沒有這行，`add`／`delete`／`similaritySearch` 不會產生 `db.vector.client.operation` 指標與追蹤資料 —— Jaeger 上會看到 HTTP span 直接跳到 LLM span，中間那段「到底花多久在檢索」完全消失。同理，七個 ChatClient 也都是用 `ChatClient.builder(model, observationRegistry, null, null)` 明確帶入 registry 而非走無參數版本。
 
 Metrics 部分刻意關掉了 OTLP 匯出（`management.otlp.metrics.export.enabled=false`），只走 Prometheus 一條路 —— 兩邊都開會讓同一份指標重複計算。Trace 採樣率設為 `1.0`（100%），方便本機逐筆檢視，正式環境絕不該這樣設。
-
-### 🖥️ 資料驅動的前端導覽
-
-前端的核心設計是**選單不硬編碼在 JSX 裡**。`src/config/apiRoutes.js` 匯出的 `apiGroups` 是 8 個群組、23 條路由的唯一來源，`Navbar` 直接 map 它產生選單。新增一個展示頁只要動三個地方：
-
-```jsx
-// 1. src/config/apiRoutes.js — 在對應群組加一筆（選單自動出現）
-{ path: "/my-feature/endpoint", label: "我的功能", model: "gpt-4.1-mini", requiresUserName: true }
-
-// 2. src/App.jsx — 加一條 Route
-<Route path="/my-feature/endpoint" element={<MyFeaturePage />} />
-
-// 3. src/pages/MyFeaturePage.jsx — 薄包裝，通常 4–10 行
-export default function MyFeaturePage() {
-  return <ChatBox endpoint="/my-feature/endpoint" title="我的功能" description="此展示說明。" />;
-}
-```
-
-> ⚠️ `apiRoutes.js` **只定義選單**，不建立 React Route —— 兩邊都要加。只加前者會出現點了沒反應的選單項，只加後者則是路由存在但選單找不到入口。
-
-`ChatBox` 負責所有共通行為：
-
-- **請求取消** — 用 `AbortController`，元件卸載時清理。換頁時進行中的請求被靜默丟棄，不會跳出誤導性的錯誤訊息。
-- **錯誤轉譯** — `errorToText()` 區分四種情境：`axios.isCancel` 回 `null`（不顯示）、有 `error.response` 顯示 `HTTP {status}` 與回應內容、有 `error.request` 顯示「無法連線到後端服務，請確認 Spring Boot 是否已啟動。」、其餘走 `error.message`。
-- **前置驗證** — `requiresUserName` 為 true 時，未填使用者名稱會先擋下並提示，不會發出注定 400 的請求。
-
-> 📌 錯誤轉譯的邏輯在 `ChatBox.jsx` 的 `errorToText()`，**不在** `api/client.js` —— 後者目前只設定 `baseURL` 與 120 秒逾時，且刻意不固定 `Content-Type`，讓一般物件走 `application/json`、`FormData` 走帶 boundary 的 `multipart/form-data`。
-
----
 
 ## 4. 技術棧
 

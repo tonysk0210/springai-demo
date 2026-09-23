@@ -374,7 +374,6 @@ springai-demo/
 │   │       └── component/rag/                    # RagDataLoader、TavilyWebSearchDocumentRetriever
 │   ├── src/main/resources/
 │   │   ├── application.properties                # 模型、H2、Qdrant、Redis、OTel、上傳限制
-│   │   ├── application-monitoring.properties     # 只有一行：開啟 trace 匯出
 │   │   ├── api.properties                        # ⚠️ Tavily 金鑰，目前在版控中（見附錄）
 │   │   ├── promptTemplate/                       # 4 個 StringTemplate（.st）
 │   │   ├── ApexTech_Solutions_HR_Policy_Manual.pdf   # RAG 語料（繁體中文）
@@ -729,25 +728,12 @@ Tavily 金鑰目前放在 `mySpringAi/src/main/resources/api.properties` 的 `ta
 .\mvnw.cmd test                                                                   # 執行測試
 .\mvnw.cmd -Dtest=AudioControllerTest test                                        # 單一測試類別
 .\mvnw.cmd clean package                                                          # 建置 JAR
-.\mvnw.cmd spring-boot:run "-Dspring-boot.run.arguments=--spring.profiles.active=monitoring"
 
 # 前端
 npm run build      # 正式建置
 npm run preview    # 預覽建置結果
 npm run lint       # ESLint
 ```
-
-### 關於 monitoring profile
-
-`monitoring` 是 **Spring profile，不是 Docker Compose profile**。啟用後套用 `application-monitoring.properties`，內容只有一行：
-
-```properties
-management.tracing.export.enabled=true
-```
-
-> ⚠️ `compose.yml` **沒有定義任何 profile**，五個容器（Qdrant、Redis、Prometheus、Grafana、Jaeger）一律同時啟動 —— `docker compose --profile monitoring up` 這種寫法對本專案沒有意義。
-
----
 
 ## 6. 附錄
 

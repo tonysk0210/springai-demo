@@ -12,7 +12,7 @@
 - `./mvnw test`：執行完整測試套件。
 - `./mvnw -Dtest=AudioControllerTest test`：開發期間只執行指定的測試類別。
 - `./mvnw clean package`：編譯、測試，並在 `target/` 產生可執行 JAR。
-- `docker compose --profile monitoring up -d`：啟動 Qdrant、Redis、Jaeger、Prometheus 與 Grafana；使用完畢後執行 `docker compose --profile monitoring down`。
+- `docker compose up -d`：啟動 Qdrant、Redis、Jaeger、Prometheus 與 Grafana；使用完畢後執行 `docker compose down`。
 
 ## 程式碼風格與命名慣例
 

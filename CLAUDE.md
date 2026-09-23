@@ -16,7 +16,6 @@
 ### 後端（`mySpringAi/`）
 ```bash
 ./mvnw spring-boot:run                          # 啟動 API，監聽 :8080（自動啟動 Docker 服務）
-./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=monitoring"
 ./mvnw test                                     # 執行所有測試
 ./mvnw -Dtest=AudioControllerTest test          # 執行單一測試類別
 ./mvnw clean package                            # 建置 JAR
@@ -31,8 +30,7 @@ npm run lint
 
 ### 基礎設施（`mySpringAi/`）
 ```bash
-docker compose up                        # 啟動 Qdrant、Redis、Jaeger
-docker compose --profile monitoring up  # 另加 Prometheus、Grafana
+docker compose up                        # 啟動 Qdrant、Redis、Prometheus、Grafana、Jaeger
 ```
 
 ## 架構說明

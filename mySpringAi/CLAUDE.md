@@ -15,9 +15,6 @@
 # 啟動（監聽 :8080，自動透過 compose.yml 啟動 Docker 服務）
 ./mvnw spring-boot:run
 
-# 啟動並啟用監控 profile（加入 OpenTelemetry/Prometheus/Grafana 設定）
-./mvnw spring-boot:run -Dspring-boot.run.arguments="--spring.profiles.active=monitoring"
-
 # 打包建置
 ./mvnw clean package
 

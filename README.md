@@ -447,22 +447,38 @@ public ChatClient.Builder openaiBuilder(OpenAiChatModel model, ObservationRegist
 
 ### 🔍 四種 RAG 策略並陳
 
-四條 RAG 端點是一條由淺入深的光譜，用同一份語料（繁體中文 HR 手冊）就能看出差別：
+四條端點都會「找資料，再讓 LLM 根據資料回答」，但差別在於：**資料從哪裡找**、**RAG 流程由誰編排**，以及是否加入額外的前／後處理。`/rag/rag`、`/rag/ragPdf` 與 `/rag/preAndPostRAAdvisor` 都使用本機繁體中文 HR 手冊的向量資料；`/rag/ragTavily` 則改用即時網路搜尋，並非同一份語料。
 
-| 端點 | 檢索來源 | 參數 | 誰負責組 prompt |
+| 端點 | 文件來源 | RAG 流程誰負責 | 額外處理 |
 |---|---|---|---|
-| `/rag/rag` | Qdrant `rag-collection` | topK=5、threshold=0.8 | **Controller 自己** — 手動 `similaritySearch`，把結果填進 `RagPromptTemplate.st` 的 `{documents}` 當 system prompt |
-| `/rag/ragPdf` | Qdrant `pdf-collection` | topK=3、threshold=0.5 | `RetrievalAugmentationAdvisor` — 一行 `.advisors(pdfRAAdvisor)` 完成檢索＋增強 |
-| `/rag/ragTavily` | Tavily Web Search API | 依 API 回傳 | 同上，但檢索器換成自訂的 `TavilyWebSearchDocumentRetriever` |
-| `/rag/preAndPostRAAdvisor` | Qdrant `pdf-collection` | topK=5、threshold=0.7 | 同上，另加**前置查詢翻譯**與**後置 PII 遮罩** |
+| `/rag/rag` | Qdrant `rag-collection` | **Controller 手寫**：查詢、整理文件、組 prompt 都在 Controller | topK=5、threshold=0.8 |
+| `/rag/ragPdf` | Qdrant `pdf-collection` | **`RetrievalAugmentationAdvisor`**：自動檢索並將 context 加進 prompt | topK=3、threshold=0.5 |
+| `/rag/ragTavily` | Tavily Web Search API | **`RetrievalAugmentationAdvisor`**：流程相同，但改用自訂的 `TavilyWebSearchDocumentRetriever` | 即時網路搜尋；結果與筆數由 Tavily API 決定 |
+| `/rag/preAndPostRAAdvisor` | Qdrant `pdf-collection` | **`RetrievalAugmentationAdvisor`**：自動檢索與 prompt 增強 | topK=5、threshold=0.7；前置 query 翻譯、後置 PII 遮罩 |
+
+用流程看會更直接：
+
+```text
+/rag/rag
+Controller：查 Qdrant → 將文件填入 system prompt → 呼叫 LLM
+
+/rag/ragPdf
+Advisor：查 Qdrant → 將文件與問題組成增強後 user prompt → 呼叫 LLM
+
+/rag/ragTavily
+Advisor：查 Tavily 網路 → 將搜尋結果與問題組成增強後 user prompt → 呼叫 LLM
+
+/rag/preAndPostRAAdvisor
+Advisor：翻譯問題 → 查 Qdrant → 遮罩文件 PII → 組成增強後 user prompt → 呼叫 LLM
+```
 
 三個對照重點：
 
-1. **手動 vs Advisor** — `/rag/rag` 把檢索結果塞進 **system** prompt 的 `{documents}`；`RetrievalAugmentationAdvisor` 則是改寫 **user** message，且 template placeholder **必須**是 `{context}` 與 `{query}`（Spring AI 硬性規定）。換句話說兩者的 template 不能互換使用。
-2. **order = −10 的用意** — 三個 RA Advisor 都設定 `.order(-10)`，早於 `PrettyLoggerAdvisor` 的 `-1`。這不影響功能，但決定了 log 印出的是增強**後**的 prompt —— 少了這行，你在 log 裡永遠看不到 RAG 到底檢索到什麼、塞了多少進去。
-3. **翻譯成繁中而非英文** — `preAndPost-RA-Advisor` 的 `TranslationQueryTransformer` 目標語言設為 `traditional chinese`，因為 `pdf-collection` 存的是繁體中文文件，**查詢與語料同語言時 embedding 命中率明顯較高**。用中文提問時翻譯前後語意大致不變，改用英文提問才會看到明顯效果。這個 transformer 外面還包了一層 lambda 把翻譯前後的 query 都寫進 log，方便驗證實際送去檢索的文字。
+1. **手動 vs Advisor** — `/rag/rag` 把檢索結果填入 **system** prompt 的 `{documents}`；其餘三條則由 `RetrievalAugmentationAdvisor` 改寫 **user** message，template placeholder 必須是 `{context}` 與 `{query}`（Spring AI 的規定），兩種 template 不能直接互換。
+2. **Tavily 是替換 Retriever，不是更複雜的同語料版本** — `/rag/ragPdf` 與 `/rag/ragTavily` 的 RAG 編排方式相同；差別只在前者查本機 Qdrant，後者查即時網路。這展示了只替換 Retriever 即可更換知識來源。
+3. **進階前／後處理** — `preAndPost-RA-Advisor` 的 `TranslationQueryTransformer` 將 query 翻成 `traditional chinese`，讓查詢與 `pdf-collection` 的繁中語料對齊；檢索後的 `MaskingDocumentPostProcessor` 在文件加入 prompt 前遮掉 Email 與電話，因此 PII 不會送往 LLM。此端點多一次翻譯 LLM 呼叫，會增加延遲與 token 成本。
 
-後置的 `MaskingDocumentPostProcessor` 在 Document 送進 prompt **之前**遮掉 Email 與電話 —— 順序很重要：遮罩發生在檢索之後、增強之前，所以 PII 從頭到尾不會進入送往 LLM 的請求。
+三個 RA Advisor 都設定 `.order(-10)`，早於 `PrettyLoggerAdvisor` 的 `-1`；因此 logger 會看到已完成 RAG 增強的 prompt，而非原始問題。
 
 ### ⚡ 兩套語意快取對照
 

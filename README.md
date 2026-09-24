@@ -20,7 +20,7 @@
   <img alt="Ollama" src="https://img.shields.io/badge/Ollama-llama3.2%3A1b-000000?logo=ollama&logoColor=white">
   <img alt="Qdrant" src="https://img.shields.io/badge/Qdrant-Vector%20DB-DC244C?logo=qdrant&logoColor=white">
   <img alt="Redis" src="https://img.shields.io/badge/Redis%20Stack-Semantic%20Cache-FF4438?logo=redis&logoColor=white">
-  <img alt="H2" src="https://img.shields.io/badge/H2-Chat%20Memory-09476B?logo=h2database&logoColor=white">
+  <img alt="H2" src="https://img.shields.io/badge/H2-File%20DB%20%C2%B7%20Chat%20Memory-09476B?logo=h2database&logoColor=white">
 </p>
 <p>
   <img alt="OpenTelemetry" src="https://img.shields.io/badge/OpenTelemetry-Tracing-000000?logo=opentelemetry&logoColor=white">

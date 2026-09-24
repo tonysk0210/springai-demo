@@ -6,8 +6,8 @@
   <img alt="Java" src="https://img.shields.io/badge/Java-25-ED8B00?logo=openjdk&logoColor=white">
   <img alt="Spring Boot" src="https://img.shields.io/badge/Spring%20Boot-4.1.0-6DB33F?logo=springboot&logoColor=white">
   <img alt="Spring AI" src="https://img.shields.io/badge/Spring%20AI-2.0.0-6DB33F?logo=spring&logoColor=white">
-  <img alt="Maven" src="https://img.shields.io/badge/Maven-3.9.11-C71A36?logo=apachemaven&logoColor=white">
   <img alt="Lombok" src="https://img.shields.io/badge/Lombok-1.18.46-BC4521?logo=lombok&logoColor=white">
+  <img alt="Maven" src="https://img.shields.io/badge/Maven-3.9.11-C71A36?logo=apachemaven&logoColor=white">
 </p>
 <p>
   <img alt="React" src="https://img.shields.io/badge/React-19.2.7-61DAFB?logo=react&logoColor=black">
